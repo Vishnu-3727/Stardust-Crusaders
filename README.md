@@ -196,8 +196,14 @@ rule-05 claim checkable rather than assertable:
 
 ```bash
 docker build -t fuzzy-rs .
-docker run --rm -i fuzzy-rs --help
+docker run --rm --entrypoint sh fuzzy-rs -c 'command -v python python3 || echo no python'
+# no python
+docker run --rm --entrypoint sh fuzzy-rs -c 'ldd /usr/local/bin/fuzzy'
+# libgcc_s.so.1, libc.so.6 — that is the entire dependency set
 ```
+
+Built and run green on Docker 29.6.2, 118 MB image. Linux and Windows agree
+byte-for-byte, brace bugs included — `cent` → `KNT`, `science` → `SKNK` on both.
 
 ### As a library
 
