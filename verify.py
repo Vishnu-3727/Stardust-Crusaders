@@ -71,15 +71,31 @@ def main():
     )
 
     print("\nZero-unsafe bonus")
-    lib = (ROOT / "crates" / "fuzzy" / "src" / "lib.rs").read_text()
-    check("#![forbid(unsafe_code)] is present", "#![forbid(unsafe_code)]" in lib)
-    sources = list((ROOT / "crates").rglob("*.rs"))
-    offenders = [
-        p.relative_to(ROOT)
-        for p in sources
-        if "unsafe " in p.read_text() and "forbid(unsafe_code)" not in p.read_text()
+    # forbid(unsafe_code) at a crate root covers that whole crate, submodules
+    # included, and unlike `deny` it cannot be switched back off by an inner
+    # #[allow]. So the check that actually means something is: every crate root
+    # carries it. Grepping for the token only catches what someone left lying
+    # around in a crate that never banned it in the first place.
+    roots = sorted(
+        p for p in (ROOT / "crates").rglob("*.rs") if p.name in ("lib.rs", "main.rs")
+    )
+    unguarded = [
+        p.relative_to(ROOT) for p in roots if "#![forbid(unsafe_code)]" not in p.read_text()
     ]
-    check("no `unsafe` blocks in any crate", not offenders, str(offenders))
+    check(
+        f"#![forbid(unsafe_code)] on every crate root ({len(roots)} found)",
+        roots and not unguarded,
+        str(unguarded) if roots else "no crate roots found - glob is wrong",
+    )
+    # Belt and braces: the attribute above makes this unreachable, but it fails
+    # loudly if someone ever adds a crate and forgets the attribute.
+    offenders = [
+        f"{p.relative_to(ROOT)}:{i}"
+        for p in (ROOT / "crates").rglob("*.rs")
+        for i, line in enumerate(p.read_text().splitlines(), 1)
+        if "unsafe" in line and "forbid(unsafe_code)" not in line and not line.lstrip().startswith("//")
+    ]
+    check("no `unsafe` anywhere in crates/", not offenders, str(offenders))
 
     print("\nFunctionality - the port's own tests")
     r = run(["cargo", "test", "--quiet"])

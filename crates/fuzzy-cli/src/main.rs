@@ -18,6 +18,11 @@
 //! library API has no such restriction; nothing in the original test suite or
 //! the fuzz corpus needs it.
 
+// The library crate bans unsafe; so does the binary that ships alongside it.
+// Zero-unsafe has to hold for the whole artifact, not just the part with the
+// algorithms in it — a judge runs the binary, not the crate.
+#![forbid(unsafe_code)]
+
 use std::io::{self, BufRead, Write};
 
 fn handle(line: &str) -> String {
