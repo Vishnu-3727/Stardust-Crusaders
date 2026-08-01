@@ -36,7 +36,9 @@ modified = false
 [artifact]
 binary = "target/release/fuzzy"
 links_python = false
-unsafe_code = false             # #![forbid(unsafe_code)] in crates/fuzzy/src/lib.rs
+unsafe_code = false             # #![forbid(unsafe_code)] on every crate root -
+                                # crates/fuzzy and crates/fuzzy-cli both, so the
+                                # shipped binary is covered, not just the library
 
 [bonuses]
 differential_fuzz = true        # DMETAPHONE + NYSIIS; see fuzz/log.txt
