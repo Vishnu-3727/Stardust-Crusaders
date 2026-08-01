@@ -51,12 +51,37 @@ fn handle(line: &str) -> String {
 fn main() -> io::Result<()> {
     let mut args = std::env::args().skip(1);
     if let Some(flag) = args.next() {
-        if flag == "--help" || flag == "-h" {
-            print!("{}", include_str!("usage.txt"));
-            return Ok(());
+        match flag.as_str() {
+            "--help" | "-h" => {
+                print!("{}", include_str!("usage.txt"));
+                return Ok(());
+            }
+            // In-process throughput, so the benchmark can separate the
+            // library's cost from the pipe's. Reads the corpus from stdin.
+            "--bench" => {
+                let algo = args.next().unwrap_or_else(|| "DMETAPHONE".into());
+                let words: Vec<String> = io::stdin().lock().lines().collect::<Result<_, _>>()?;
+                let start = std::time::Instant::now();
+                let mut sink = 0usize;
+                for w in &words {
+                    sink += match algo.as_str() {
+                        "SOUNDEX" => fuzzy::soundex(w, 4).map(|c| c.len()).unwrap_or(0),
+                        "NYSIIS" => fuzzy::nysiis(w).len(),
+                        _ => fuzzy::dmetaphone(w, 0)
+                            .map(|(p, s)| p.map_or(0, |x| x.len()) + s.map_or(0, |x| x.len()))
+                            .unwrap_or(0),
+                    };
+                }
+                let elapsed = start.elapsed();
+                // `sink` is printed so the loop cannot be optimised away.
+                println!("{} {} {}", words.len(), elapsed.as_nanos(), sink);
+                return Ok(());
+            }
+            other => {
+                eprintln!("unknown argument {other:?}; try --help");
+                std::process::exit(2);
+            }
         }
-        eprintln!("unknown argument {flag:?}; try --help");
-        std::process::exit(2);
     }
 
     let stdin = io::stdin().lock();

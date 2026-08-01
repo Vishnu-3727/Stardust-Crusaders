@@ -1,0 +1,30 @@
+{
+  "corpus_words": 14590,
+  "iterations": 3,
+  "platform": "win32",
+  "note": "read bench/methodology.md before quoting these",
+  "throughput_words_per_sec": {
+    "port_in_process": 2041787,
+    "original_c_in_process": 1215833,
+    "port_via_pipe": 133260,
+    "original_c_via_pipe": 196706,
+    "algorithm_ratio_port_over_c": 1.68
+  },
+  "startup_ms": {
+    "port_median": 20.15,
+    "original_c_median": 19.55
+  },
+  "round_trip_latency_us": {
+    "p50": 28.5,
+    "p99": 111.5,
+    "max": 5385.6
+  },
+  "peak_rss_mb": {
+    "port": 4.0,
+    "original_c": 4.81
+  },
+  "binary_bytes": {
+    "port": 201728,
+    "original_c_oracle": 153988
+  }
+}

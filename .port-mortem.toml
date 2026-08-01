@@ -19,8 +19,16 @@ license = "MIT"
 [test_suite]
 path = "tests/original/test_fuzzy.py"
 upstream_path = "test/test_fuzzy.py"
-sha256 = "6dd19f9a38f848001d990ccb3745213a60efbb36a11293642f1b3bdbd5510ae5"
+size_bytes = 738
+sha256 = "799ce873e2d629d36e849b5a99b74ff923ddba273734edf65c73b1f5624321a8"
+# Stronger than the digest: this is upstream's own git blob id for the file, so
+# `git hash-object tests/original/test_fuzzy.py` reproduces the object hash in
+# yougov/fuzzy's history. It cannot match unless the bytes are identical.
+git_blob = "a5ff4adb996a60e637c13137488fa43892d0c2bc"
 modified = false
+# .gitattributes pins `-text` on this path. Without it, Windows checkouts get
+# CRLF, the file grows to 775 bytes, and both hashes above stop matching a file
+# nobody edited.
 
 # Rule 05: no source-language runtime. The port links no interpreter; the
 # Python that appears in this repo is test scaffolding and tooling only, and

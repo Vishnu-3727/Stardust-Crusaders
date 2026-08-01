@@ -1,0 +1,13 @@
+# Rule 02 hinges on tests/original/test_fuzzy.py being byte-identical to
+# upstream. Git's autocrlf would rewrite it on checkout — on Windows the file
+# arrives with CRLF, its SHA-256 changes, and it looks modified when it is not.
+# `-text` pins the bytes on every platform.
+tests/original/test_fuzzy.py -text
+
+# The vendored original C is a reference artifact; leave its bytes alone too.
+oracle/double_metaphone.c -text
+oracle/double_metaphone.h -text
+
+# Everything we wrote: normalise to LF in the repo.
+* text=auto eol=lf
+*.exe binary

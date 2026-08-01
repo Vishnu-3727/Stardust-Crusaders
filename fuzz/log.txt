@@ -1,0 +1,15 @@
+# differential fuzz: DMETAPHONE
+# oracle: C:\Users\vishn\Projects\port-mortem\fuzzy-rs\oracle\dm_oracle.exe
+# port:   C:\Users\vishn\Projects\port-mortem\fuzzy-rs\target\release\fuzzy.exe
+# seed=20260801 batch=2000 seconds=120.0
+# excluded from the claimed surface: SOUNDEX (upstream behavior is UB)
+# checked 1172000 inputs in 120.2s (9749/s)
+# divergences: 0
+
+# differential fuzz: NYSIIS
+# oracle: C:\Users\vishn\.pyenv\pyenv-win\versions\3.12.9\python.exe C:\Users\vishn\Projects\port-mortem\fuzzy-rs\oracle\nysiis_oracle.py
+# port:   C:\Users\vishn\Projects\port-mortem\fuzzy-rs\target\release\fuzzy.exe
+# seed=20260801 batch=2000 seconds=60.0
+# excluded from the claimed surface: SOUNDEX (upstream behavior is UB)
+# checked 358000 inputs in 60.3s (5932/s)
+# divergences: 0
