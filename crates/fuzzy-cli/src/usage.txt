@@ -1,0 +1,15 @@
+fuzzy — phonetic algorithms (Soundex, NYSIIS, Double Metaphone)
+Rust port of yougov/fuzzy. Reads requests on stdin, writes responses on stdout.
+
+  request   ALGO<TAB>SIZE<TAB>WORD
+  response  OK<TAB>...   or   ERR<TAB>message
+
+  SOUNDEX     SIZE = output width, zero-padded    -> OK<TAB>code
+  NYSIIS      SIZE ignored                        -> OK<TAB>code
+  DMETAPHONE  SIZE = cap, 0 means unbounded       -> OK<TAB>primary<TAB>secondary
+
+Absent metaphone codes are written NULL. Non-ASCII input to SOUNDEX or
+DMETAPHONE is an error, matching the Cython original.
+
+  $ printf 'DMETAPHONE\t0\tmayer\n' | fuzzy
+  OK	MR	NULL

@@ -1,0 +1,5 @@
+/target
+oracle/dm_oracle
+oracle/dm_oracle.exe
+__pycache__/
+.pytest_cache/

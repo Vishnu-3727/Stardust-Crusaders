@@ -1,0 +1,37 @@
+# Port Mortem 2026 submission manifest.
+
+track = "H"                      # open pair
+source_language = "Python"       # in practice Python + Cython + C
+target_language = "Rust"
+
+[source]
+repo = "https://github.com/yougov/fuzzy"
+commit = "e15b195467223a684a26fadb53997bf6f36be2c4"
+license = "MIT"
+# What the repo actually is, as opposed to what the README implies:
+#   src/double_metaphone.c  26,965 B  Maurice Aubrey's 1999 C — the real engine
+#   src/fuzzy.pyx            5,301 B  Cython: Soundex + NYSIIS + the C wrapper
+#   test/test_fuzzy.py         738 B  the entire test suite, 5 tests, 3 xfail
+
+# Rule 02: the original test suite is hashed at kickoff so judges can diff it.
+# This file is carried unmodified at tests/original/test_fuzzy.py — the hash
+# below is of BOTH copies, and `make verify` re-checks it.
+[test_suite]
+path = "tests/original/test_fuzzy.py"
+upstream_path = "test/test_fuzzy.py"
+sha256 = "6dd19f9a38f848001d990ccb3745213a60efbb36a11293642f1b3bdbd5510ae5"
+modified = false
+
+# Rule 05: no source-language runtime. The port links no interpreter; the
+# Python that appears in this repo is test scaffolding and tooling only, and
+# none of it is in the shipped artifact. See DECISIONS.md 01.
+[artifact]
+binary = "target/release/fuzzy"
+links_python = false
+unsafe_code = false             # #![forbid(unsafe_code)] in crates/fuzzy/src/lib.rs
+
+[bonuses]
+differential_fuzz = true        # DMETAPHONE + NYSIIS; see fuzz/log.txt
+zero_unsafe = true
+decision_log = true             # DECISIONS.md
+bug_catcher = true              # two unfiled brace bugs; see DECISIONS.md 04 and 05
