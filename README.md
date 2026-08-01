@@ -13,7 +13,31 @@ $ pytest tests/original -v
 $ python fuzz/harness.py --seconds 120
 # checked 1172000 inputs in 120.2s
 # divergences: 0                        # against the original C, compiled
+
+$ python verify.py
+all checks passed                       # 11/11, every claim below
 ```
+
+| | |
+|---|---|
+| Unsafe blocks | **0** — `#![forbid(unsafe_code)]` on every crate root |
+| Dependencies | **0** — the library and the binary both |
+| Differential fuzz | **2.5M+ inputs, 0 divergences** |
+| Upstream suite | unmodified, git blob id matches upstream |
+| New upstream bugs found | **2**, both reported |
+
+---
+
+## Contents
+
+- [What this library is, and why it was worth porting](#what-this-library-is-and-why-it-was-worth-porting)
+- [The result](#the-result)
+- [Behavior is preserved, bugs included](#behavior-is-preserved-bugs-included)
+- [Equivalence, measured](#equivalence-measured)
+- [Performance](#performance)
+- [Build and run](#build-and-run)
+- [Verify every claim on this page](#verify-every-claim-on-this-page)
+- [Layout](#layout)
 
 ---
 
@@ -51,13 +75,13 @@ ls = strlen(cs) # ...and then read
 
 A string library corrupting its caller's memory. That is not a bug you fix with
 a patch and a test; it is a bug the language permitted. Rust does not permit it,
-and not by discipline — `crates/fuzzy` is `#![forbid(unsafe_code)]` and has zero
-dependencies, so there is no line in this repo where that class of defect could
-be written.
+and not by discipline — every crate root here is `#![forbid(unsafe_code)]` with
+zero dependencies, so there is no line in this repo where that class of defect
+could be written.
 
 The other memory bug — a guaranteed heap overrun when `size == 0` — is in
 [`DECISIONS.md` 03](DECISIONS.md). There are two more, in the C, that nobody had
-filed at all: see **New bugs found** below.
+filed at all: see [New bugs found](#new-bugs-found).
 
 ---
 
@@ -88,6 +112,10 @@ Not "diffs clean" — the same git object as upstream's:
 $ git hash-object tests/original/test_fuzzy.py
 a5ff4adb996a60e637c13137488fa43892d0c2bc     # == yougov/fuzzy@e15b195:test/test_fuzzy.py
 ```
+
+It runs unmodified because `tests/original/shim/fuzzy.py` satisfies
+`import fuzzy` over a **pipe, not a link** — the port artifact contains no
+Python and links no interpreter. See [`DECISIONS.md` 01](DECISIONS.md).
 
 ---
 
@@ -168,8 +196,8 @@ verbatim from `fuzzy.pyx`.
 | NYSIIS | the original `.pyx` routine | 358,000 | **0** |
 | Soundex | *excluded — upstream is UB* | — | — |
 
-Captured in [`fuzz/log.txt`](fuzz/log.txt) (seed 20260801). An earlier run at a
-different seed added 1,354,000 more Double Metaphone inputs, also clean.
+Captured in [`fuzz/log.txt`](fuzz/log.txt) (seed 20260801). Earlier runs at other
+seeds add ~1M more Double Metaphone inputs and ~1M more NYSIIS, also clean.
 
 Soundex is excluded on purpose and the exclusion is stated everywhere it
 matters: its upstream behavior is a read-after-free, so there is nothing stable
@@ -183,6 +211,30 @@ them constantly.
 
 ---
 
+## Performance
+
+Measured, not estimated — `python bench/run.py`, 14,590-word corpus, 3
+iterations, methodology in [`bench/methodology.md`](bench/methodology.md).
+Reported in both directions, including where the port loses:
+
+| | port | original C | |
+|---|---|---|---|
+| Algorithm, in-process | 2,041,787 w/s | 1,215,833 w/s | **1.68× faster** |
+| Via the line protocol | 133,260 w/s | 196,706 w/s | **32% slower** |
+| Startup, median | 20.15 ms | 19.55 ms | a wash |
+| Peak RSS | 4.00 MB | 4.81 MB | 17% lower |
+| Binary size | 201,728 B | 153,988 B | 31% larger |
+
+Round-trip latency over the pipe: p50 28.5 µs, p99 111.5 µs.
+
+The honest reading: **the algorithm is faster, the transport is slower.** The
+32% pipe deficit is the cost of the subprocess boundary that keeps the port free
+of a Python link — a deliberate trade ([`DECISIONS.md` 14](DECISIONS.md)), and
+it disappears entirely for anyone using the crate as a library. Startup is
+dominated by Windows process spawn, so the ~0.6 ms gap is noise, not a result.
+
+---
+
 ## Build and run
 
 ```bash
@@ -191,8 +243,17 @@ printf 'DMETAPHONE\t0\tmayer\n' | ./target/release/fuzzy
 # OK	MR	NULL
 ```
 
-Or with Docker — the runtime stage contains no Python, which is what makes the
-rule-05 claim checkable rather than assertable:
+### Tests
+
+```bash
+cargo test                    # the port's own tests
+pytest tests/original -v      # upstream's suite, unmodified
+```
+
+### Docker
+
+The runtime stage contains no Python, which is what makes the rule-05 claim
+checkable rather than assertable:
 
 ```bash
 docker build -t fuzzy-rs .
@@ -223,8 +284,9 @@ Zero dependencies. `#![forbid(unsafe_code)]`.
 python verify.py             # ~2 min    (--quick for ~20s)
 ```
 
-Checks the test-suite hash and git blob id, the absence of any Python linkage,
-the absence of `unsafe`, `cargo test`, the upstream suite, and a fresh
+11 checks: the test-suite SHA-256 **and** its git blob id, the absence of any
+Python linkage, `forbid(unsafe_code)` on every crate root, no `unsafe` token
+anywhere in `crates/`, `cargo test`, the upstream suite, the XPASS, and a fresh
 differential fuzz of both surfaces. Exits non-zero if any claim is false.
 
 ---
@@ -241,9 +303,20 @@ tests/original/          upstream's test_fuzzy.py, byte-identical
   shim/fuzzy.py            satisfies `import fuzzy` over a pipe, not a link
 oracle/                  the original C + its driver; the differential reference
 fuzz/harness.py          differential fuzzer
+fuzz/drift.py            how far upstream drifted from the published algorithm
 bench/                   methodology and results
+upstream-issues/         the two bug reports, with reproducers
 DECISIONS.md             22 entries — every non-obvious call and its cost
+REPORT.md                how the project was built, phase by phase
+DEMO.md                  the 5-minute walkthrough runsheet
 ```
+
+## Further reading
+
+- [`REPORT.md`](REPORT.md) — the full technical report: where this started, what
+  changed, and what is measurably better.
+- [`DECISIONS.md`](DECISIONS.md) — 22 entries, each a call that could have gone
+  the other way, with its cost stated.
 
 ## License
 
