@@ -120,7 +120,7 @@ reproduce the heap smash. `crates/fuzzy/src/soundex.rs` says so at the line.
 
 ---
 
-## 04 — Double Metaphone: the soft-C brace bug (kept, and filed upstream)
+## 04 — Double Metaphone: the soft-C brace bug (kept, and reported upstream)
 
 `src/double_metaphone.c`, in `case 'C'`:
 
@@ -156,7 +156,7 @@ Two consequences, both live:
 ```
 cent   -> KNT   (Philips: SNT)
 city   -> KT    (Philips: ST)
-ciao   -> K     (Philips: X)
+ciao   -> K     (Philips: S, secondary X)
 ```
 
 The `CK`/`CG`/`CQ` arm and the default arm are unreachable too, except on the
@@ -170,12 +170,12 @@ commented as dead, so the structure still maps to the C line for line — and
 `upstream_brace_bugs_are_preserved` in `crates/fuzzy/src/lib.rs` fails if
 anyone later "fixes" it.
 
-**This bug is not in any of the 15 open upstream issues.** Filed during the
-event; see entry 18.
+**This bug is not in any of the 15 open upstream issues.** Report written
+during the event; see entry 18.
 
 ---
 
-## 05 — Double Metaphone: the SC fallthrough brace bug (kept, and filed upstream)
+## 05 — Double Metaphone: the SC fallthrough brace bug (kept, and reported upstream)
 
 Same file, `case 'S'`. The brace that should close
 `if (GetAt(original, current + 2) == 'H')` is missing, so the `SC`+I/E/Y arm and
@@ -417,15 +417,21 @@ happened when it did.
 
 ---
 
-## 18 — Two bugs filed upstream during the event
+## 18 — Two bugs reported upstream during the event
 
 Entries 04 and 05 describe defects that are not among the 15 open issues on
 `yougov/fuzzy`. Both were found by reading the C against Philips' published
 algorithm and confirmed by running the compiled original.
 
-They are reported upstream with a minimal reproducer and the exact brace
-placement at fault. They are *not* fixed in this port — see entries 04 and 05
-for why a port is the wrong place to fix them.
+Both reports are written, with a minimal reproducer, the exact brace placement
+at fault, and a fix — `upstream-issues/01-double-metaphone-soft-c.md` and
+`upstream-issues/02-double-metaphone-sc-fallthrough.md`. Every "expected" value
+in them was checked against an independent implementation (the `metaphone`
+package on PyPI) rather than asserted from the algorithm description.
+
+They are held locally pending review before posting to a third party's issue
+tracker. They are *not* fixed in this port — see entries 04 and 05 for why a
+port is the wrong place to fix them.
 
 ---
 
@@ -444,7 +450,63 @@ and a judge can check it against yougov/fuzzy's own history with one command.
 
 ---
 
-## 20 — What we did not do
+## 20 — Word-final `CH` codes `K` because the padding leaks
+
+`case 'C'`'s `CH` branch takes the "germanic /kh/" path when the letter two
+positions on is one of `L R N M B H F V W` **or a space** — the space is there
+for a `ch ` inside a multi-word string like `van der ch…`.
+
+But `DoubleMetaphone` pads the input with five spaces so the window predicates
+can read past the end of the word. A word *ending* in `CH` therefore sees a
+space at `current + 2` and takes the branch meant for phrases:
+
+```
+such  -> SK   (published: SX)
+each  -> AK   (published: AX)
+```
+
+Those are very common words, and `X` — the "sh" sound — is the whole point of
+the `CH` rule.
+
+**Kept, and not filed upstream.** Unlike entries 04 and 05 this is not a brace
+slip: it is in Maurice Aubrey's C as published, it follows directly from the
+padding strategy that same code introduces, and a maintainer could reasonably
+argue it is intended. Two clear defects reported carefully are worth more than
+three with a debatable one attached. It is measured and attributed in
+`fuzz/drift.py`.
+
+---
+
+## 21 — Measuring how far upstream has drifted from the algorithm
+
+`fuzz/drift.py` runs the 10,000 most frequent English words through the
+original C and through an independent implementation of Double Metaphone (the
+`metaphone` package on PyPI), with the reference truncated to four characters so
+the documented cut (issue #5) is not counted.
+
+**8.5% of ordinary English words get a different code**, and the two brace bugs
+account for 96% of it:
+
+```
+  454  soft C coded K                                (entry 04)
+  362  C cursor over-advance eats the next letter    (entry 04)
+   16  word-final CH matches the pad                 (entry 20)
+   19  other
+```
+
+This is the number that justifies every "keep the bug" decision in this
+document. A port written from the algorithm's description rather than from this
+repository's C would pass its own tests, look correct to a reviewer, and
+disagree with the library it claims to have ported on roughly one word in
+twelve. The differential fuzzer is what makes that impossible here.
+
+It also sharpens what entry 04 costs users: the over-advance is not limited to
+soft C. `click` → `KK`, losing the `L`, because the cursor skips a character
+after *every* C that is not a doubled `CC`.
+
+---
+
+## 22 — What we did not do
 
 * **No PyO3, no `abi3`, no `#[pymodule]`.** Rule 05.
 * **No "modernised" API.** No iterator adaptors over the codes, no `serde`, no

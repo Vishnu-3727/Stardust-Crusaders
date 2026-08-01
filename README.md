@@ -10,8 +10,8 @@ Source commit [`e15b195`](https://github.com/yougov/fuzzy/commit/e15b195467223a6
 $ pytest tests/original -v
 2 passed, 1 xpassed, 2 xfailed          # upstream's own suite, byte-identical
 
-$ python fuzz/harness.py --seconds 180
-# checked 1354000 inputs in 180.2s
+$ python fuzz/harness.py --seconds 120
+# checked 1172000 inputs in 120.2s
 # divergences: 0                        # against the original C, compiled
 ```
 
@@ -117,13 +117,42 @@ compiled original:
 1. **Soft C is coded `K`** — a stray pair of braces rebinds an `else` from the
    inner `if` to the outer one, so Pierce's rule fires for every `C` that is not
    `CC`. The `CI`/`CE`/`CY` branch is unreachable and the cursor over-advances,
-   swallowing the next letter. `cent` → `KNT`, `city` → `KT`, `ciao` → `K`.
+   swallowing the next letter — and the over-advance hits hard C too, so
+   `click` → `KK`, losing the `L`. `cent` → `KNT`, `city` → `KT`.
 2. **`SC` not followed by `H` falls through entirely** — a missing closing brace
    puts the `SC`+I/E/Y and default `SK` arms inside a block whose every path
    already `break`s. Dead code. `science` → `SKNK`, `scissors` → `SKSR`.
 
-Reported upstream during the event. Deliberately **not** fixed here
+Both reports are written up in [`upstream-issues/`](upstream-issues/) with
+reproducers and fixes, every expected value checked against an independent
+implementation. Deliberately **not** fixed in this port
 ([`DECISIONS.md` 04, 05](DECISIONS.md)).
+
+### How much does this actually matter?
+
+`python fuzz/drift.py` runs the 10,000 most frequent English words through the
+original C and through an independent Double Metaphone, with the reference
+truncated to four characters so upstream's documented cut is not counted:
+
+```
+fuzzy disagrees with the published algorithm on 851 of them (8.5%)
+
+    454  soft C coded K
+    362  C cursor over-advance eats the next letter
+     16  word-final CH matches the padding
+     19  other
+
+  services   fuzzy=SRFK  published=SRFS
+  click      fuzzy=KK    published=KLK
+  city       fuzzy=KT    published=ST
+  price      fuzzy=PRK   published=PRS
+```
+
+**One ordinary English word in twelve.** That is the number behind every
+"keep the bug" decision here: a port written from the algorithm's description
+would pass its own tests, look right in review, and disagree with the library
+it claims to have ported on 8.5% of real input. The differential fuzzer is what
+makes that failure mode impossible.
 
 ---
 
@@ -207,7 +236,7 @@ tests/original/          upstream's test_fuzzy.py, byte-identical
 oracle/                  the original C + its driver; the differential reference
 fuzz/harness.py          differential fuzzer
 bench/                   methodology and results
-DECISIONS.md             20 entries — every non-obvious call and its cost
+DECISIONS.md             22 entries — every non-obvious call and its cost
 ```
 
 ## License
